@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferenceforge-grafana-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"   # Grafana sidecar picks this up automatically
+data:
+  inferenceforge.json: |
+    # contents injected by: kubectl create configmap inferenceforge-grafana-dashboard
+    # --from-file=inferenceforge.json=k8s/monitoring/grafana-dashboard.json
+    # --namespace monitoring --dry-run=client -o yaml | kubectl apply -f -

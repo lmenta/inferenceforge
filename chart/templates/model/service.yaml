@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferenceforge-model
+  labels:
+    app: inferenceforge-model
+    app.kubernetes.io/name: inferenceforge
+spec:
+  selector:
+    app: inferenceforge-model
+  ports:
+    - name: http
+      port: {{ .Values.model.backendPort }}
+      targetPort: {{ .Values.model.backendPort }}
+  type: ClusterIP

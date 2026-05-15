@@ -6,7 +6,7 @@ IMAGE     = inferenceforge-gateway
 
 # ── Local development ─────────────────────────────────────────────────────────
 
-local-up: cluster-create build ollama-pull deploy-local open-grafana
+local-up: cluster-create build ollama-pull deploy-local monitoring open-grafana
 	@echo "✓ InferenceForge running locally"
 	@echo "  Gateway:  http://localhost:8080"
 	@echo "  Grafana:  http://localhost:30300 (admin/admin)"
@@ -40,8 +40,24 @@ deploy-local:
 	@echo "Waiting for pods..."
 	kubectl rollout status deployment/inferenceforge-gateway -n $(NAMESPACE) --timeout=120s
 
+monitoring:
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
+	helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+	  --namespace monitoring --create-namespace \
+	  --set grafana.service.type=NodePort \
+	  --set grafana.service.nodePort=30300 \
+	  --set grafana.adminPassword=admin \
+	  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+	  --wait --timeout 5m
+	kubectl create configmap inferenceforge-grafana-dashboard \
+	  --from-file=inferenceforge.json=k8s/monitoring/grafana-dashboard.json \
+	  --namespace monitoring --dry-run=client -o yaml \
+	  | kubectl label -f - --dry-run=client -o yaml --local grafana_dashboard=1 \
+	  | kubectl apply -f -
+
 open-grafana:
-	@echo "Grafana at http://localhost:30300 (when Prometheus stack is deployed)"
+	@echo "Opening Grafana at http://localhost:30300 (admin/admin)"
+	open http://localhost:30300 || true
 
 # ── Testing ────────────────────────────────────────────────────────────────────
 
