@@ -1,0 +1,25 @@
+# Local development overrides
+# Usage: helm template test ./chart -f chart/values-local.yaml
+#        helm install inferenceforge ./chart -f chart/values-local.yaml
+
+model:
+  backend: ollama
+  name: gemma3:1b      # change to llama3.2 or any model you have pulled
+  backendPort: 11434
+
+gpu:
+  enabled: false        # CPU only locally
+
+gateway:
+  image: inferenceforge-gateway
+  tag: latest
+  replicas: 1           # single replica locally
+  port: 8080
+  rateLimit: 120        # more relaxed for local testing
+  queueDepth: 20
+
+autoscaling:
+  enabled: false        # no HPA locally
+
+monitoring:
+  enabled: false        # install separately with: make monitoring
