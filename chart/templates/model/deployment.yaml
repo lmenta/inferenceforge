@@ -1,0 +1,105 @@
+{{- if eq .Values.model.backend "ollama" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferenceforge-model
+  labels:
+    app: inferenceforge-model
+spec:
+  replicas: {{ .Values.model.replicas }}
+  selector:
+    matchLabels:
+      app: inferenceforge-model
+  template:
+    metadata:
+      labels:
+        app: inferenceforge-model
+    spec:
+      {{- if .Values.gpu.enabled }}
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        node.kubernetes.io/instance-type: {{ .Values.gpu.instanceType }}
+      {{- end }}
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 11434
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+              {{- if .Values.gpu.enabled }}
+              nvidia.com/gpu: "{{ .Values.gpu.count }}"
+              {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: model-storage
+              mountPath: /root/.ollama
+      volumes:
+        - name: model-storage
+          emptyDir: {}
+{{- else }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferenceforge-model
+  labels:
+    app: inferenceforge-model
+spec:
+  replicas: {{ .Values.model.replicas }}
+  selector:
+    matchLabels:
+      app: inferenceforge-model
+  template:
+    metadata:
+      labels:
+        app: inferenceforge-model
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        node.kubernetes.io/instance-type: {{ .Values.gpu.instanceType }}
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--model"
+            - "{{ .Values.model.name }}"
+            - "--tensor-parallel-size"
+            - "{{ .Values.gpu.count }}"
+            - "--gpu-memory-utilization"
+            - "{{ .Values.gpu.memoryUtilization }}"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8000"
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              nvidia.com/gpu: "{{ .Values.gpu.count }}"
+              memory: "16Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 10
+{{- end }}

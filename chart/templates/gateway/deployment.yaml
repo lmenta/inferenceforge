@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferenceforge-gateway
+  labels:
+    app: inferenceforge-gateway
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app: inferenceforge-gateway
+  template:
+    metadata:
+      labels:
+        app: inferenceforge-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.gateway.port }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: gateway
+          image: "{{ .Values.gateway.image }}:{{ .Values.gateway.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .Values.gateway.port }}
+          env:
+            - name: MODEL_BACKEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: inferenceforge-config
+                  key: model_backend_url
+            - name: MODEL_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: inferenceforge-config
+                  key: model_name
+            - name: BACKEND_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: inferenceforge-config
+                  key: backend_type
+            - name: RATE_LIMIT_PER_MINUTE
+              value: "{{ .Values.gateway.rateLimit }}"
+            - name: QUEUE_MAX_DEPTH
+              value: "{{ .Values.gateway.queueDepth }}"
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.gateway.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: {{ .Values.gateway.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10

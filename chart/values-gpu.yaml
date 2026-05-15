@@ -1,0 +1,14 @@
+# GPU overrides — apply on top of values.yaml for EKS GPU deployment
+# Usage: helm upgrade --install inferenceforge . -f values.yaml -f values-gpu.yaml
+
+model:
+  backend: vllm
+  name: mistralai/Mistral-7B-Instruct-v0.2
+  backendPort: 8000
+
+gpu:
+  enabled: true
+  type: nvidia-t4
+  count: 1
+  memoryUtilization: "0.90"
+  instanceType: g4dn.xlarge

@@ -1,0 +1,50 @@
+# InferenceForge Helm Values
+# Local CPU:  helm install inferenceforge . -f values.yaml
+# AWS GPU:    helm install inferenceforge . -f values.yaml -f values-gpu.yaml
+
+model:
+  backend: ollama           # ollama | vllm
+  name: tinyllama           # tinyllama | phi3 | mistral-7b | llama3-8b
+  replicas: 1
+  backendPort: 11434        # 11434 for ollama, 8000 for vllm
+
+gpu:
+  enabled: false            # true on EKS GPU nodes
+  type: nvidia-t4           # nvidia-t4 | nvidia-a10g
+  count: 1
+  memoryUtilization: "0.90"
+  instanceType: g4dn.xlarge
+
+gateway:
+  image: inferenceforge-gateway
+  tag: latest
+  replicas: 2
+  port: 8080
+  rateLimit: 60             # requests per minute per client
+  queueDepth: 100
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  cpuThreshold: 70
+  queueDepthThreshold: 10
+
+monitoring:
+  enabled: true
+  grafana:
+    adminPassword: admin
+    service:
+      type: NodePort
+      nodePort: 30300
+
+ingress:
+  enabled: false
+  host: inferenceforge.example.com

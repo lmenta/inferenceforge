@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inferenceforge-model
+  labels:
+    app: inferenceforge-model
+    component: model-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inferenceforge-model
+  template:
+    metadata:
+      labels:
+        app: inferenceforge-model
+        component: model-backend
+    spec:
+      # ── GPU scheduling ────────────────────────────────────────────────────
+      # Tolerate GPU taint applied by NVIDIA device plugin DaemonSet.
+      # Without this, the pod won't schedule on GPU nodes.
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+      # Pin to GPU instance type on EKS.
+      # Remove nodeSelector for CPU-only local development.
+      # nodeSelector:
+      #   node.kubernetes.io/instance-type: g4dn.xlarge
+      #   eks.amazonaws.com/nodegroup: gpu-workers
+
+      # Prefer GPU nodes but don't require them (allows CPU fallback locally)
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: "k8s.amazonaws.com/accelerator"
+                    operator: In
+                    values: ["nvidia-tesla-t4", "nvidia-tesla-a10g"]
+
+      containers:
+        - name: model-backend
+          # Local: use Ollama. GPU (AWS): swap to vllm image.
+          image: ollama/ollama:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 11434
+          env:
+            - name: OLLAMA_MODELS
+              value: "/models"
+          volumeMounts:
+            - name: model-storage
+              mountPath: /models
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "2Gi"
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+              # Uncomment on GPU nodes:
+              # nvidia.com/gpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+      volumes:
+        - name: model-storage
+          emptyDir: {}
+
+---
+# ── GPU version (vLLM on EKS) — apply this instead of above on GPU nodes ────
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: inferenceforge-model-gpu
+# spec:
+#   replicas: 1
+#   template:
+#     spec:
+#       tolerations:
+#         - key: nvidia.com/gpu
+#           operator: Exists
+#           effect: NoSchedule
+#       nodeSelector:
+#         node.kubernetes.io/instance-type: g4dn.xlarge
+#       containers:
+#         - name: vllm
+#           image: vllm/vllm-openai:latest
+#           args:
+#             - "--model"
+#             - "mistralai/Mistral-7B-Instruct-v0.2"
+#             - "--tensor-parallel-size"
+#             - "1"
+#             - "--gpu-memory-utilization"
+#             - "0.90"
+#           resources:
+#             limits:
+#               nvidia.com/gpu: "1"
+#               memory: "16Gi"
+#           ports:
+#             - containerPort: 8000

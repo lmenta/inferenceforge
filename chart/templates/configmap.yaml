@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferenceforge-config
+  labels:
+    app.kubernetes.io/name: inferenceforge
+data:
+  model_backend_url: "http://inferenceforge-model:{{ .Values.model.backendPort }}"
+  model_name: "{{ .Values.model.name }}"
+  backend_type: "{{ .Values.model.backend }}"

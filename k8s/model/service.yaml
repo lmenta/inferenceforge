@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inferenceforge-model
+  labels:
+    app: inferenceforge-model
+spec:
+  selector:
+    app: inferenceforge-model
+  ports:
+    - name: http
+      port: 11434       # Ollama port (vLLM uses 8000 — set via configmap)
+      targetPort: 11434
+  type: ClusterIP       # Internal only — gateway is the public face
